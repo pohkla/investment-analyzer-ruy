@@ -935,41 +935,57 @@ async def analyze(
     current_price: str = Form(""),
     notes: str = Form(""),
 ):
-    try:
+
+    signal = "WAIT"
+    signal_label = "WAIT / รอจังหวะยืนยัน"
+    summary = "ยังไม่สามารถวิเคราะห์ได้"
+    detected_symbol = None
+    detected_timeframe = None
+    avg_direction = 0.0
+    avg_volatility = 0.25
+    ocr_quality = 0.0
+    levels = []
+    image_details = []
+    reasons = []
+    cautions = []
+    trade_plan = {
+        "reference_price": None,
+        "entry": None,
+        "stop_loss": None,
+        "take_profit_1": None,
+        "take_profit_2": None,
+        "bias": "รอข้อมูลเพิ่ม",
+        "rr_text": "-",
+        "support": None,
+        "resistance": None,
+        "swing_low": None,
+        "swing_high": None,
+    }
+
+        try:
         if not files:
             return JSONResponse(status_code=400, content={"ok": False, "error": "No files uploaded"})
 
-        # --- ของเดิมทั้งหมดอยู่ในนี้ ---
-        # (ไม่ต้องแก้ logic ข้างใน)
+        try:
+            user_price = float(current_price) if str(current_price).strip() else None
+        except ValueError:
+            user_price = None
 
-        return JSONResponse({
-            "ok": True,
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "signal": signal,
-            "signal_label": signal_label,
-            "summary": summary,
-            "detected_symbol": detected_symbol,
-            "detected_timeframe": detected_timeframe,
-            "direction_score": avg_direction,
-            "volatility_score": avg_volatility,
-            "ocr_quality": ocr_quality,
-            "trade_plan": trade_plan,
-            "market_structure": {...},
-            "reasons": reasons,
-            "cautions": cautions,
-            "detected_levels": levels,
-            "images": image_details,
-        })
+        all_prices: list[float] = []
+        symbols: list[str | None] = []
+        timeframes: list[str | None] = []
+        direction_scores: list[float] = []
+        vol_scores: list[float] = []
+        swing_highs: list[float] = []
+        swing_lows: list[float] = []
+        breakout_signals: list[str] = []
+        liquidity_labels: list[str] = []
+        trendline_biases: list[str] = []
+        candle_labels: list[str] = []
+        candle_detail_samples: list[dict[str, Any]] = []
 
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "ok": False,
-                "error": str(e),
-                "type": type(e).__name__
-            }
-        )
+        # ... วาง logic เดิมทั้งหมดของคุณต่อจากนี้ ...
+
 
     all_prices: list[float] = []
     symbols: list[str | None] = []
@@ -1123,3 +1139,43 @@ async def analyze(
         },
     }
     return JSONResponse(content=json.loads(json.dumps(payload, default=str)))
+
+
+            return JSONResponse({
+            "ok": True,
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "signal": signal,
+            "signal_label": signal_label,
+            "summary": summary,
+            "detected_symbol": detected_symbol,
+            "detected_timeframe": detected_timeframe,
+            "direction_score": avg_direction,
+            "volatility_score": avg_volatility,
+            "ocr_quality": ocr_quality,
+            "trade_plan": trade_plan,
+            "market_structure": {
+                "trend_label": "UPTREND" if avg_direction > 0.18 else "DOWNTREND" if avg_direction < -0.18 else "SIDEWAYS",
+                "candle_bias": dominant_candle,
+                "trendline_bias": dominant_trendline,
+                "trendline_summary": trendline_info["trendline_summary"] if image_details else "-",
+                "breakout_signal": breakout_info["breakout_signal"],
+                "breakout_context": breakout_info["breakout_context"],
+                "liquidity_label": breakout_info["liquidity_label"],
+                "liquidity_context": breakout_info["liquidity_context"],
+                "candlestick_detail": dominant_candle_detail,
+            },
+            "reasons": reasons,
+            "cautions": cautions,
+            "detected_levels": levels,
+            "images": image_details,
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": str(e),
+                "type": type(e).__name__
+            }
+        )
