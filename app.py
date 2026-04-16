@@ -326,8 +326,24 @@ document.getElementById('analyzeBtn').addEventListener('click', async ()=>{
   fd.append('notes', document.getElementById('notes').value || '');
   fd.append('current_price', document.getElementById('currentPrice').value || '');
   try {
-    const resp = await fetch('/analyze', { method:'POST', body:fd });
-    const data = await resp.json();
+const resp = await fetch('/analyze', { method:'POST', body:fd });
+
+const text = await resp.text();
+let data;
+
+try {
+  data = JSON.parse(text);
+} catch (e) {
+  alert("Backend ไม่ได้ส่ง JSON:\n\n" + text);
+  return;
+}
+
+if (!resp.ok || !data.ok) {
+  alert("วิเคราะห์ไม่สำเร็จ:\n" + (data.error || "Unknown error"));
+  return;
+}
+
+renderResults(data);
     if(!resp.ok) throw new Error(data.detail || 'Analyze failed');
     renderResults(data);
   } catch(err){
@@ -919,13 +935,41 @@ async def analyze(
     current_price: str = Form(""),
     notes: str = Form(""),
 ):
-    if not files:
-        return JSONResponse(status_code=400, content={"detail": "No files uploaded"})
-
     try:
-        user_price = float(current_price) if str(current_price).strip() else None
-    except ValueError:
-        user_price = None
+        if not files:
+            return JSONResponse(status_code=400, content={"ok": False, "error": "No files uploaded"})
+
+        # --- ของเดิมทั้งหมดอยู่ในนี้ ---
+        # (ไม่ต้องแก้ logic ข้างใน)
+
+        return JSONResponse({
+            "ok": True,
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "signal": signal,
+            "signal_label": signal_label,
+            "summary": summary,
+            "detected_symbol": detected_symbol,
+            "detected_timeframe": detected_timeframe,
+            "direction_score": avg_direction,
+            "volatility_score": avg_volatility,
+            "ocr_quality": ocr_quality,
+            "trade_plan": trade_plan,
+            "market_structure": {...},
+            "reasons": reasons,
+            "cautions": cautions,
+            "detected_levels": levels,
+            "images": image_details,
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": str(e),
+                "type": type(e).__name__
+            }
+        )
 
     all_prices: list[float] = []
     symbols: list[str | None] = []
