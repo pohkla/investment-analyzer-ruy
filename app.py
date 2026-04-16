@@ -10,12 +10,34 @@ from typing import Any
 
 import cv2
 import numpy as np
-import pytesseract
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from PIL import Image
 
+OCR_AVAILABLE = False
+OCR_ERROR = ""
+
+try:
+    import pytesseract
+    pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+    OCR_AVAILABLE = True
+except Exception as e:
+    pytesseract = None
+    OCR_ERROR = str(e)
+
 app = FastAPI(title="Ray Local Investment Analyzer v6")
+
+
+def run_ocr_from_image(img: np.ndarray) -> str:
+    if not OCR_AVAILABLE or pytesseract is None:
+        return f"OCR not available on server: {OCR_ERROR}"
+
+    try:
+        pil_img = Image.fromarray(img)
+        text = pytesseract.image_to_string(pil_img)
+        return text.strip()
+    except Exception as e:
+        return f"OCR failed: {e}"
 
 HTML = r'''<!DOCTYPE html>
 <html lang="th">
