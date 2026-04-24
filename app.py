@@ -493,6 +493,144 @@ def ai_analysis_placeholder(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+
+def price_text(value: Any) -> str:
+    v = safe_float(value)
+    if v is None:
+        return "ยังไม่พบราคาจากภาพ"
+    if abs(v) >= 100:
+        return f"{v:,.2f}"
+    if abs(v) >= 1:
+        return f"{v:,.4f}"
+    return f"{v:,.6f}"
+
+
+def explain_trade_plan_for_humans(summary: Dict[str, Any], trade_plan: Dict[str, Any]) -> str:
+    signal = str(trade_plan.get("signal", "WAIT")).upper()
+    trend = summary.get("trend", "Unknown")
+    bias = summary.get("bias", "Neutral")
+    confidence = summary.get("confidence", 0)
+    volatility = summary.get("volatility", "Unknown")
+    entry = trade_plan.get("entry")
+    sl = trade_plan.get("stop_loss")
+    tp1 = trade_plan.get("take_profit_1")
+    tp2 = trade_plan.get("take_profit_2")
+    rr = trade_plan.get("risk_reward", "N/A")
+
+    if signal == "BUY":
+        action = "มุมมองหลักคือฝั่งซื้อ: รอจังหวะราคายืนยันก่อนเข้า BUY"
+        simple_rule = "เข้าได้เมื่อแท่งราคาปิดไปทางขึ้น หรือราคาย่อลงมาแล้วไม่หลุดโซนรับ"
+        invalid = "ถ้าราคาหลุด Stop Loss ให้หยุดทันที ห้ามถัวเฉลี่ยเพิ่ม"
+    elif signal == "SELL":
+        action = "มุมมองหลักคือฝั่งขาย: รอจังหวะราคายืนยันก่อนเข้า SELL"
+        simple_rule = "เข้าได้เมื่อแท่งราคาปิดไปทางลง หรือราคาดีดขึ้นแล้วไม่ผ่านโซนต้าน"
+        invalid = "ถ้าราคาทะลุ Stop Loss ให้หยุดทันที ห้ามสวนเพิ่ม"
+    else:
+        action = "ยังไม่ควรเข้าออเดอร์: ให้ WAIT ก่อน"
+        simple_rule = "รอให้ราคาเลือกทางชัดเจน เช่น Breakout, Breakdown หรือ Retest สำเร็จ"
+        invalid = "อย่ารีบเข้าเพราะสัญญาณยังไม่ชัด"
+
+    lines = [
+        "แผนเทรดแบบเข้าใจง่าย",
+        "========================",
+        f"1) คำสั่งที่ระบบแนะนำ: {signal}",
+        f"2) ภาพรวมตลาด: {trend} / Bias = {bias}",
+        f"3) ความมั่นใจของสัญญาณ: {confidence}%",
+        f"4) ความผันผวน: {volatility}",
+        "",
+        "ต้องทำอะไรตอนนี้",
+        f"- {action}",
+        f"- กติกาเข้าไม้: {simple_rule}",
+        "",
+        "ตัวเลขสำหรับวางแผน",
+        f"- Entry: {price_text(entry)}",
+        f"- Stop Loss: {price_text(sl)}",
+        f"- Take Profit 1: {price_text(tp1)}",
+        f"- Take Profit 2: {price_text(tp2)}",
+        f"- Risk/Reward: {rr}",
+        "",
+        "วิธีเทรดตามแบบปลอดภัย",
+        "- ใช้ความเสี่ยงต่อไม้ไม่เกิน 0.5% - 1% ของพอร์ต",
+        "- ถ้าราคาไปถึง TP1 ให้พิจารณาปิดบางส่วน หรือเลื่อน SL ลดความเสี่ยง",
+        "- ถ้าราคากลับมาชน SL ให้ยอมขาดทุนตามแผน ห้ามแก้มือทันที",
+        f"- {invalid}",
+        "",
+        "หมายเหตุ",
+        "- ถ้า Entry/SL/TP เป็น 'ยังไม่พบราคาจากภาพ' แปลว่า OCR อ่านราคาจากรูปไม่ได้ ให้เปิดกราฟจริงแล้ววางระดับด้วยตัวเองก่อนเข้าออเดอร์",
+        "- ระบบนี้เป็น Prototype ใช้ช่วยตัดสินใจ ไม่ใช่คำสั่งลงทุน 100%"
+    ]
+    return "\n".join(lines)
+
+
+def explain_technical_details_for_humans(result: Dict[str, Any]) -> str:
+    summary = result.get("summary", {}) or {}
+    metadata = result.get("metadata", {}) or {}
+    ocr = result.get("ocr", {}) or {}
+    image = result.get("image_analysis") or {}
+    data = result.get("data_analysis") or {}
+    source = data if data else image
+
+    symbol = summary.get("symbol") or metadata.get("symbol") or "Unknown"
+    tf = summary.get("timeframe") or metadata.get("timeframe") or "Unknown"
+    trend = summary.get("trend", "Unknown")
+    confidence = summary.get("confidence", 0)
+    breakout = source.get("breakout", "No clear breakout")
+    volatility = summary.get("volatility", "Unknown")
+
+    if data:
+        method = "Data Mode: วิเคราะห์จาก CSV OHLC จริง จึงน่าเชื่อถือกว่าการอ่านจากรูป"
+        indicators = [
+            f"- EMA20: {price_text(data.get('ema20'))}",
+            f"- EMA50: {price_text(data.get('ema50'))}",
+            f"- RSI14: {data.get('rsi14', 'N/A')}",
+            f"- ATR14: {price_text(data.get('atr'))}",
+            f"- Support ล่าสุด: {price_text((data.get('support_resistance') or {}).get('support'))}",
+            f"- Resistance ล่าสุด: {price_text((data.get('support_resistance') or {}).get('resistance'))}",
+        ]
+        why = "ระบบดูว่า EMA20 อยู่เหนือ/ใต้ EMA50, ราคาปิดอยู่ฝั่งไหนของ EMA และ RSI อยู่ในโซนสนับสนุนทิศทางหรือไม่"
+    else:
+        method = "Image Mode: วิเคราะห์จากรูปภาพด้วย OpenCV + OCR เท่าที่อ่านได้จาก Screenshot"
+        sr = image.get("support_resistance", {}) or {}
+        indicators = [
+            f"- แนวรับเชิงภาพ: {sr.get('support_visual', [])}",
+            f"- แนวต้านเชิงภาพ: {sr.get('resistance_visual', [])}",
+            f"- Swing High ที่พบ: {len(image.get('swing_highs', []) or [])} จุด",
+            f"- Swing Low ที่พบ: {len(image.get('swing_lows', []) or [])} จุด",
+            f"- Liquidity Zone: {image.get('liquidity_zones', [])}",
+        ]
+        why = "ระบบดูเส้นทางราคาในภาพว่าเอียงขึ้น เอียงลง หรือแกว่งออกข้าง แล้วประเมินโซนรับ-ต้านจากตำแหน่งกราฟ"
+
+    ocr_status = "ใช้งานได้" if ocr.get("available") else f"ใช้งานไม่ได้ / {ocr.get('error', 'OCR unavailable')}"
+
+    lines = [
+        "สรุป Technical Details แบบภาษาคน",
+        "================================",
+        f"สินทรัพย์ที่อ่านได้: {symbol}",
+        f"Timeframe ที่อ่านได้: {tf}",
+        f"วิธีวิเคราะห์: {method}",
+        f"สถานะ OCR: {ocr_status}",
+        "",
+        "ระบบเห็นอะไรจากกราฟ",
+        f"- Trend: {trend}",
+        f"- Confidence: {confidence}%",
+        f"- Volatility: {volatility}",
+        f"- Breakout/Breakdown: {breakout}",
+        "",
+        "ค่าหรือโซนสำคัญที่ใช้ตัดสินใจ",
+        *indicators,
+        "",
+        "แปลผลแบบง่าย",
+        f"- {why}",
+        "- Confidence ยิ่งสูง แปลว่าภาพรวมสัญญาณยิ่งสอดคล้องกันมากขึ้น",
+        "- ถ้าความผันผวนสูง ให้ลด Lot / ลดขนาด Position เพราะ SL อาจถูกกินง่าย",
+        "",
+        "ข้อควรระวัง",
+        "- Screenshot อาจอ่านราคา/แท่งเทียนผิดได้ ควรเช็กบนกราฟจริงอีกครั้ง",
+        "- ถ้า Symbol หรือ Timeframe เป็น Unknown ให้กรอกหรือยืนยันเองก่อนนำไปเทรดจริง",
+    ]
+    return "\n".join(lines)
+
+
 def build_unified_result(
     mode: str,
     metadata: Dict[str, Any],
@@ -523,6 +661,10 @@ def build_unified_result(
         "risk_warning": "This is an educational prototype, not financial advice. Trading involves risk. Always confirm with live market data and your own risk management.",
     }
     payload["ai_analysis"] = ai_analysis_placeholder(payload)
+    payload["human_report"] = {
+        "trade_plan_easy": explain_trade_plan_for_humans(payload["summary"], trade_plan),
+        "technical_easy": explain_technical_details_for_humans(payload),
+    }
     return payload
 
 
@@ -574,7 +716,7 @@ HTML_PAGE = r'''
   <style>
     :root{--bg:#070817;--panel:#101426;--panel2:#151a31;--line:#27304f;--text:#eef3ff;--muted:#96a3c7;--blue:#41a6ff;--purple:#9b5cff;--green:#35e39c;--red:#ff5c7a;--yellow:#ffd166;}
     *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at top left,#16265d 0,#070817 38%,#050611 100%);color:var(--text);min-height:100vh}
-    .wrap{max-width:1180px;margin:auto;padding:24px}.hero{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:stretch}.card{background:linear-gradient(180deg,rgba(21,26,49,.94),rgba(10,13,27,.94));border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:22px}.brand{display:flex;gap:12px;align-items:center}.logo{width:46px;height:46px;border-radius:15px;background:linear-gradient(135deg,var(--blue),var(--purple));display:grid;place-items:center;font-weight:900}.badge{display:inline-flex;gap:6px;align-items:center;padding:7px 10px;border-radius:999px;background:rgba(65,166,255,.12);border:1px solid rgba(65,166,255,.35);color:#bfe1ff;font-size:12px}.hero h1{font-size:42px;line-height:1.04;margin:18px 0 10px}.grad{background:linear-gradient(90deg,#65c7ff,#b488ff);-webkit-background-clip:text;color:transparent}.muted{color:var(--muted)}.tabs{display:flex;gap:10px;margin:18px 0}.tab{border:1px solid var(--line);background:#0b1024;color:var(--text);padding:11px 14px;border-radius:13px;cursor:pointer}.tab.active{border-color:var(--blue);background:rgba(65,166,255,.15)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.drop{min-height:275px;border:1.5px dashed #4f5f95;border-radius:20px;padding:18px;display:grid;place-items:center;text-align:center;background:rgba(12,17,39,.72);transition:.2s}.drop.drag{border-color:var(--blue);background:rgba(65,166,255,.12)}input[type=file]{display:none}.btn{border:0;border-radius:14px;padding:13px 17px;color:white;background:linear-gradient(135deg,var(--blue),var(--purple));font-weight:800;cursor:pointer;box-shadow:0 12px 30px rgba(65,166,255,.25)}.btn.secondary{background:#161d38;border:1px solid var(--line);box-shadow:none}.btn.danger{background:rgba(255,92,122,.15);border:1px solid rgba(255,92,122,.5);color:#ffdbe2}.preview{max-width:100%;max-height:310px;border-radius:16px;border:1px solid var(--line);display:none}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.metric{background:rgba(255,255,255,.04);border:1px solid var(--line);padding:15px;border-radius:16px}.metric b{display:block;font-size:22px;margin-top:6px}.signal-BUY{color:var(--green)}.signal-SELL{color:var(--red)}.signal-WAIT{color:var(--yellow)}.progress{height:10px;background:#202746;border-radius:999px;overflow:hidden}.bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));width:0%}pre{white-space:pre-wrap;word-break:break-word;background:#050814;border:1px solid var(--line);border-radius:16px;padding:15px;color:#d8e4ff;max-height:360px;overflow:auto}.hidden{display:none}.journal-item{display:flex;justify-content:space-between;gap:12px;border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:14px;padding:12px;margin:10px 0}.footer{margin-top:22px;text-align:center;color:var(--muted);font-size:13px}.warning{border-color:rgba(255,209,102,.35);background:rgba(255,209,102,.08)}
+    .wrap{max-width:1180px;margin:auto;padding:24px}.hero{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:stretch}.card{background:linear-gradient(180deg,rgba(21,26,49,.94),rgba(10,13,27,.94));border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:22px}.brand{display:flex;gap:12px;align-items:center}.logo{width:46px;height:46px;border-radius:15px;background:linear-gradient(135deg,var(--blue),var(--purple));display:grid;place-items:center;font-weight:900}.badge{display:inline-flex;gap:6px;align-items:center;padding:7px 10px;border-radius:999px;background:rgba(65,166,255,.12);border:1px solid rgba(65,166,255,.35);color:#bfe1ff;font-size:12px}.hero h1{font-size:42px;line-height:1.04;margin:18px 0 10px}.grad{background:linear-gradient(90deg,#65c7ff,#b488ff);-webkit-background-clip:text;color:transparent}.muted{color:var(--muted)}.tabs{display:flex;gap:10px;margin:18px 0}.tab{border:1px solid var(--line);background:#0b1024;color:var(--text);padding:11px 14px;border-radius:13px;cursor:pointer}.tab.active{border-color:var(--blue);background:rgba(65,166,255,.15)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.drop{min-height:275px;border:1.5px dashed #4f5f95;border-radius:20px;padding:18px;display:grid;place-items:center;text-align:center;background:rgba(12,17,39,.72);transition:.2s}.drop.drag{border-color:var(--blue);background:rgba(65,166,255,.12)}input[type=file]{display:none}.btn{border:0;border-radius:14px;padding:13px 17px;color:white;background:linear-gradient(135deg,var(--blue),var(--purple));font-weight:800;cursor:pointer;box-shadow:0 12px 30px rgba(65,166,255,.25)}.btn.secondary{background:#161d38;border:1px solid var(--line);box-shadow:none}.btn.danger{background:rgba(255,92,122,.15);border:1px solid rgba(255,92,122,.5);color:#ffdbe2}.preview{max-width:100%;max-height:310px;border-radius:16px;border:1px solid var(--line);display:none}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.metric{background:rgba(255,255,255,.04);border:1px solid var(--line);padding:15px;border-radius:16px}.metric b{display:block;font-size:22px;margin-top:6px}.signal-BUY{color:var(--green)}.signal-SELL{color:var(--red)}.signal-WAIT{color:var(--yellow)}.progress{height:10px;background:#202746;border-radius:999px;overflow:hidden}.bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));width:0%}pre{white-space:pre-wrap;word-break:break-word;background:#050814;border:1px solid var(--line);border-radius:16px;padding:15px;color:#d8e4ff;max-height:420px;overflow:auto}.easy{font-size:15px;line-height:1.55}.rawbox{margin-top:12px}.rawbox summary{cursor:pointer;color:#bfe1ff;margin-bottom:8px}.mini{font-size:12px;color:var(--muted);margin-top:6px}.hidden{display:none}.journal-item{display:flex;justify-content:space-between;gap:12px;border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:14px;padding:12px;margin:10px 0}.footer{margin-top:22px;text-align:center;color:var(--muted);font-size:13px}.warning{border-color:rgba(255,209,102,.35);background:rgba(255,209,102,.08)}
     @media(max-width:900px){.hero,.grid{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr}.hero h1{font-size:34px}.wrap{padding:14px}} @media(max-width:560px){.summary{grid-template-columns:1fr}.row .btn{width:100%}}
   </style>
 </head>
@@ -610,8 +752,16 @@ HTML_PAGE = r'''
         <div class="metric"><span class="muted">Confidence</span><b id="mConf">0%</b></div>
       </div>
       <div class="grid">
-        <div><h3>Trade Plan</h3><pre id="plan">No analysis yet.</pre></div>
-        <div><h3>Technical Details</h3><pre id="details">No analysis yet.</pre></div>
+        <div>
+          <h3>Trade Plan</h3>
+          <pre id="plan" class="easy">No analysis yet.</pre>
+          <details class="rawbox"><summary>ดู JSON Trade Plan สำหรับ Developer</summary><pre id="planRaw">No JSON yet.</pre></details>
+        </div>
+        <div>
+          <h3>Technical Details</h3>
+          <pre id="details" class="easy">No analysis yet.</pre>
+          <details class="rawbox"><summary>ดู JSON Technical Details สำหรับ Developer</summary><pre id="detailsRaw">No JSON yet.</pre></details>
+        </div>
       </div>
       <div class="row" style="margin-top:14px"><button class="btn secondary" id="exportReport">Export HTML Report</button><button class="btn secondary" id="saveJournal">Save to Journal</button></div>
     </section>
@@ -636,7 +786,7 @@ $('clearImage').onclick=()=>{imageFile=null;$('preview').style.display='none';$(
 async function upload(url,file){const fd=new FormData();fd.append('file',file);const res=await fetch(url,{method:'POST',body:fd});const data=await res.json();if(!res.ok)throw new Error(data.detail||'Analysis failed');return data}
 $('analyzeImage').onclick=async()=>{try{if(!imageFile)throw new Error('Please select or paste an image first.');setStatus('Analyzing image...');render(await upload('/analyze-image',imageFile));setStatus('Image analysis complete')}catch(e){setStatus(e.message)}};
 $('analyzeCsv').onclick=async()=>{try{if(!csvFile)throw new Error('Please select CSV first.');setStatus('Analyzing CSV...');render(await upload('/analyze-csv',csvFile));setStatus('CSV analysis complete')}catch(e){setStatus(e.message)}};
-function render(result){lastResult=result;const s=result.summary||{};$('mSymbol').textContent=s.symbol||'-';$('mTf').textContent=s.timeframe||'-';$('mTrend').textContent=s.trend||'-';$('mSignal').textContent=s.signal||'-';$('mSignal').className='signal-'+(s.signal||'WAIT');$('mConf').textContent=(s.confidence||0)+'%';$('confBar').style.width=(s.confidence||0)+'%';$('plan').textContent=JSON.stringify(result.trade_plan,null,2);$('details').textContent=JSON.stringify({metadata:result.metadata,ocr:result.ocr,image_analysis:result.image_analysis,data_analysis:result.data_analysis,ai_analysis:result.ai_analysis},null,2);}
+function render(result){lastResult=result;const s=result.summary||{};const h=result.human_report||{};$('mSymbol').textContent=s.symbol||'-';$('mTf').textContent=s.timeframe||'-';$('mTrend').textContent=s.trend||'-';$('mSignal').textContent=s.signal||'-';$('mSignal').className='signal-'+(s.signal||'WAIT');$('mConf').textContent=(s.confidence||0)+'%';$('confBar').style.width=(s.confidence||0)+'%';$('plan').textContent=h.trade_plan_easy||JSON.stringify(result.trade_plan,null,2);$('details').textContent=h.technical_easy||JSON.stringify({metadata:result.metadata,ocr:result.ocr,image_analysis:result.image_analysis,data_analysis:result.data_analysis,ai_analysis:result.ai_analysis},null,2);$('planRaw').textContent=JSON.stringify(result.trade_plan,null,2);$('detailsRaw').textContent=JSON.stringify({metadata:result.metadata,ocr:result.ocr,image_analysis:result.image_analysis,data_analysis:result.data_analysis,ai_analysis:result.ai_analysis},null,2);}
 function getJournal(){return JSON.parse(localStorage.getItem('rayTraderJournal')||'[]')} function setJournal(v){localStorage.setItem('rayTraderJournal',JSON.stringify(v));drawJournal()}
 $('saveJournal').onclick=()=>{if(!lastResult)return setStatus('No result to save.');const j=getJournal();j.unshift(lastResult);setJournal(j.slice(0,30));setStatus('Saved to local journal')};
 function drawJournal(){const j=getJournal();$('journal').innerHTML=j.length?'':'<p class="muted">No saved analysis.</p>';j.forEach((r,i)=>{const s=r.summary||{};const div=document.createElement('div');div.className='journal-item';div.innerHTML=`<div><b>${s.symbol||'-'} · ${s.signal||'-'} · ${s.trend||'-'}</b><p class="muted">${r.timestamp} · Confidence ${s.confidence||0}%</p></div><button class="btn danger" data-i="${i}">Delete</button>`;$('journal').appendChild(div)});document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const j=getJournal();j.splice(+b.dataset.i,1);setJournal(j)})}
