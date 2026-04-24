@@ -1,48 +1,19 @@
-# Ray Local Investment Analyzer v6
+# Ray AI Trader 🚀
+Visual & Data-driven Market Analysis Tool.
 
-เว็บวิเคราะห์ภาพกราฟแบบรันบนเครื่อง local โดยไม่ใช้ฐานข้อมูล
+## Features
+- **Visual Analysis**: Detects trends and support/resistance using OpenCV.
+- **OCR Integration**: Extracts symbols and timeframes from screenshots.
+- **Data Mode**: Analyzes OHLC CSV files with technical indicators (EMA, RSI).
+- **Modern UI**: Dark mode dashboard with drag-and-drop & clipboard support.
 
-## ความสามารถใน v6
-- อัปโหลดภาพได้หลายไฟล์
-- รองรับการ Paste ภาพจาก Clipboard ด้วย Ctrl+V
-- อ่าน Symbol จากภาพ
-- อ่าน Timeframe จากภาพ
-- OCR ราคาจากภาพ
-- ประเมินแนวโน้มจากภาพกราฟ
-- แยกแท่งเทียนแบบละเอียดขึ้น
-- อ่าน Trendline / Breakout / Liquidity Zone
-- คำนวณ Entry / Stop Loss / TP1 / TP2
-- Export รายงาน HTML สวย ๆ บน local
+## Setup & Local Run
+1. Install Tesseract OCR on your machine.
+2. `pip install -r requirements.txt`
+3. `python app.py`
 
-## เทคโนโลยี
-- FastAPI
-- OpenCV
-- Pillow
-- pytesseract
-- HTML/CSS/JavaScript ฝั่งหน้าเว็บ
-
-## วิธีรัน
-### Windows
-1. แตก zip
-2. ติดตั้ง Python 3.10+
-3. ติดตั้ง Tesseract OCR และให้คำสั่ง `tesseract` ใช้งานได้ใน PATH
-4. ดับเบิลคลิก `run_local.bat`
-5. เปิด `http://127.0.0.1:8000`
-
-### macOS / Linux
-1. แตก zip
-2. ติดตั้ง Python 3.10+
-3. ติดตั้ง Tesseract OCR และให้คำสั่ง `tesseract` ใช้งานได้ใน PATH
-4. รัน `bash run_local.sh`
-5. เปิด `http://127.0.0.1:8000`
-
-## หมายเหตุสำคัญ
-- รุ่นนี้ยังเป็น OCR + heuristic vision engine ไม่ใช่ deep learning model เต็มรูปแบบ
-- ความแม่นขึ้นอยู่กับความชัดของภาพ, การครอป, สีธีมกราฟ, และการเห็นแกนราคาชัดเจน
-- ควรใช้ผลลัพธ์เป็นเครื่องมือช่วยตัดสินใจ ไม่ใช่คำสั่งซื้อขายอัตโนมัติ
-
-## แนวทางต่อยอด
-- แยกสีแท่งเขียว/แดงจากธีมกราฟแบบเฉพาะแพลตฟอร์ม
-- เพิ่ม OCR โซนราคาเฉพาะแกนขวาให้แม่นขึ้น
-- เพิ่ม deep learning vision model สำหรับ candlestick segmentation
-- Export เป็น PDF เพิ่มเติม
+## Deploy to Render
+1. Create a new Web Service on Render.
+2. Connect your GitHub Repo.
+3. Render will automatically detect `render.yaml`.
+4. Ensure the environment is set to Python.
