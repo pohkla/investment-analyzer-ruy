@@ -1,32 +1,48 @@
-# Ray Investment Chart Analyzer
+# Ray Local Investment Analyzer v6
 
-เว็บ Python + FastAPI สำหรับ Upload รูปกราฟ แล้ววิเคราะห์แนวโน้มเบื้องต้น
+เว็บวิเคราะห์ภาพกราฟแบบรันบนเครื่อง local โดยไม่ใช้ฐานข้อมูล
 
-## Files
+## ความสามารถใน v6
+- อัปโหลดภาพได้หลายไฟล์
+- รองรับการ Paste ภาพจาก Clipboard ด้วย Ctrl+V
+- อ่าน Symbol จากภาพ
+- อ่าน Timeframe จากภาพ
+- OCR ราคาจากภาพ
+- ประเมินแนวโน้มจากภาพกราฟ
+- แยกแท่งเทียนแบบละเอียดขึ้น
+- อ่าน Trendline / Breakout / Liquidity Zone
+- คำนวณ Entry / Stop Loss / TP1 / TP2
+- Export รายงาน HTML สวย ๆ บน local
 
-- `app.py` ไฟล์หลักของเว็บ
-- `requirements.txt` รายการ Python package
-- `render.yaml` ตั้งค่า Deploy บน Render
+## เทคโนโลยี
+- FastAPI
+- OpenCV
+- Pillow
+- pytesseract
+- HTML/CSS/JavaScript ฝั่งหน้าเว็บ
 
-## Local run
+## วิธีรัน
+### Windows
+1. แตก zip
+2. ติดตั้ง Python 3.10+
+3. ติดตั้ง Tesseract OCR และให้คำสั่ง `tesseract` ใช้งานได้ใน PATH
+4. ดับเบิลคลิก `run_local.bat`
+5. เปิด `http://127.0.0.1:8000`
 
-```bash
-pip install -r requirements.txt
-uvicorn app:app --reload
-```
+### macOS / Linux
+1. แตก zip
+2. ติดตั้ง Python 3.10+
+3. ติดตั้ง Tesseract OCR และให้คำสั่ง `tesseract` ใช้งานได้ใน PATH
+4. รัน `bash run_local.sh`
+5. เปิด `http://127.0.0.1:8000`
 
-เปิดเว็บ:
+## หมายเหตุสำคัญ
+- รุ่นนี้ยังเป็น OCR + heuristic vision engine ไม่ใช่ deep learning model เต็มรูปแบบ
+- ความแม่นขึ้นอยู่กับความชัดของภาพ, การครอป, สีธีมกราฟ, และการเห็นแกนราคาชัดเจน
+- ควรใช้ผลลัพธ์เป็นเครื่องมือช่วยตัดสินใจ ไม่ใช่คำสั่งซื้อขายอัตโนมัติ
 
-```text
-http://127.0.0.1:8000
-```
-
-## Deploy on Render
-
-1. สร้าง GitHub repository
-2. Upload ไฟล์ทั้งหมดขึ้น GitHub
-3. เข้า Render
-4. New → Web Service
-5. Connect GitHub repo
-6. Render จะอ่าน `render.yaml` ให้อัตโนมัติ
-7. Deploy
+## แนวทางต่อยอด
+- แยกสีแท่งเขียว/แดงจากธีมกราฟแบบเฉพาะแพลตฟอร์ม
+- เพิ่ม OCR โซนราคาเฉพาะแกนขวาให้แม่นขึ้น
+- เพิ่ม deep learning vision model สำหรับ candlestick segmentation
+- Export เป็น PDF เพิ่มเติม
