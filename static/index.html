@@ -41,15 +41,16 @@
             <small id="condition">กำลังเชื่อมต่อข้อมูล...</small>
           </div>
         </div>
-        <div class="upload-zone" id="uploadZone">
+        <div class="upload-zone" id="uploadZone" tabindex="0" title="คลิกที่นี่แล้วกด Ctrl+V เพื่อวางรูปภาพจาก Clipboard">
           <input id="chartImageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
           <div class="upload-empty" id="uploadEmpty">
             <div class="upload-icon">🖼️</div>
             <h3>อัปโหลดรูปภาพกราฟ XAUUSD</h3>
-            <p>ลากรูปภาพมาวาง หรือคลิกเพื่อเลือกไฟล์จากเครื่อง เช่น TradingView / MT5 / MT4</p>
+            <p>ลากรูปภาพมาวาง คลิกเลือกไฟล์ หรือ Copy ภาพแล้วกด Ctrl+V เช่น TradingView / MT5 / MT4</p>
             <div class="upload-actions">
               <button id="chooseImageBtn" class="btn primary" type="button">Choose Chart Image</button>
-              <span class="muted small">รองรับ PNG, JPG, WEBP ขนาดไม่เกิน 8MB</span>
+              <button id="pasteImageBtn" class="btn ghost" type="button">Paste Image</button>
+              <span class="muted small">รองรับ PNG, JPG, WEBP ขนาดไม่เกิน 8MB • คลิกช่องนี้แล้วกด Ctrl+V / Cmd+V ได้</span>
             </div>
           </div>
           <div class="upload-preview hidden" id="uploadPreviewWrap">

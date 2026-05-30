@@ -1,5 +1,5 @@
 const el = (id) => document.getElementById(id);
-const state = { ws: null, lastAnalysis: null, uploadedImage: null };
+const state = { ws: null, lastAnalysis: null, uploadedImage: null, lastPasteSig: null, lastPasteAt: 0 };
 
 function fmt(v, digits = 2) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
@@ -142,6 +142,93 @@ async function uploadChartImage(file) {
   }
 }
 
+
+function normalizeClipboardFile(file, fallbackType = '') {
+  if (!file) return null;
+  const type = file.type || fallbackType || 'image/png';
+  if (!type.startsWith('image/')) return null;
+  const ext = type.includes('png') ? 'png' : type.includes('webp') ? 'webp' : type.includes('gif') ? 'gif' : 'jpg';
+  const name = file.name && file.name !== 'image.png' ? file.name : `pasted-chart-${Date.now()}.${ext}`;
+  return new File([file], name, { type });
+}
+
+function getImageFromClipboard(event) {
+  const data = event.clipboardData;
+  if (!data) return null;
+
+  // Case 1: Copy image file from file explorer / desktop then Ctrl+V.
+  const files = Array.from(data.files || []);
+  for (const f of files) {
+    const imageFile = normalizeClipboardFile(f);
+    if (imageFile) return imageFile;
+  }
+
+  // Case 2: Copy screenshot / image from browser / TradingView / Snipping Tool.
+  const items = Array.from(data.items || []);
+  for (const item of items) {
+    if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+      const blob = item.getAsFile();
+      const imageFile = normalizeClipboardFile(blob, item.type);
+      if (imageFile) return imageFile;
+    }
+  }
+  return null;
+}
+
+function handlePasteUpload(event) {
+  const file = getImageFromClipboard(event);
+  if (!file) return;
+
+  // Prevent duplicate firing because we listen on both zone and document for reliability.
+  const sig = `${file.name}:${file.size}:${file.type}`;
+  const now = Date.now();
+  if (state.lastPasteSig === sig && now - state.lastPasteAt < 1200) return;
+  state.lastPasteSig = sig;
+  state.lastPasteAt = now;
+
+  event.preventDefault();
+  logItem('Paste Image Detected', 'ได้รับรูปภาพจาก Clipboard กำลังอัปโหลด...');
+  uploadChartImage(file);
+}
+
+async function pasteFromClipboardButton() {
+  // Optional helper for browsers that support Clipboard API image reading.
+  try {
+    if (!navigator.clipboard?.read) {
+      logItem('Clipboard Not Supported', 'เบราว์เซอร์นี้ยังไม่รองรับปุ่ม Paste Image ให้ใช้ Ctrl+V แทน');
+      return;
+    }
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find((t) => t.startsWith('image/'));
+      if (!imageType) continue;
+      const blob = await item.getType(imageType);
+      const file = new File([blob], `clipboard-chart-${Date.now()}.${imageType.includes('png') ? 'png' : 'jpg'}`, { type: imageType });
+      logItem('Clipboard Image Detected', 'กำลังอัปโหลดรูปภาพจาก Clipboard...');
+      uploadChartImage(file);
+      return;
+    }
+    logItem('No Image In Clipboard', 'ยังไม่พบรูปภาพใน Clipboard ให้ Copy รูปหรือ Screenshot ก่อน');
+  } catch (err) {
+    logItem('Clipboard Permission', 'เบราว์เซอร์ไม่อนุญาตให้อ่าน Clipboard ให้คลิกในช่องอัปโหลดแล้วกด Ctrl+V');
+  }
+}
+
+function setupPasteUpload() {
+  const zone = el('uploadZone');
+  const pasteBtn = el('pasteImageBtn');
+
+  // Capture phase helps catch paste even when focus is on input/button inside the page.
+  window.addEventListener('paste', handlePasteUpload, true);
+  document.addEventListener('paste', handlePasteUpload, true);
+  zone?.addEventListener('paste', handlePasteUpload, true);
+
+  zone?.addEventListener('click', () => zone.focus());
+  zone?.addEventListener('focus', () => zone.classList.add('paste-ready'));
+  zone?.addEventListener('blur', () => zone.classList.remove('paste-ready'));
+  pasteBtn?.addEventListener('click', pasteFromClipboardButton);
+}
+
 function setupImageUpload() {
   const input = el('chartImageInput');
   const zone = el('uploadZone');
@@ -174,6 +261,7 @@ function setupImageUpload() {
 async function boot() {
   setupWebhookSample();
   setupImageUpload();
+  setupPasteUpload();
   await loadAnalysis(false);
   connectWS();
 }

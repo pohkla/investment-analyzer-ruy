@@ -191,3 +191,16 @@ python-multipart==0.0.20
 
 - การอัปโหลดภาพตอนนี้เป็น Image Context Mode สำหรับเก็บภาพและใช้ประกอบการวิเคราะห์ร่วมกับราคา Real-time
 - หากต้องการให้ระบบอ่านภาพกราฟแบบ Vision AI จริง เช่น อ่านแท่งเทียน เส้น EMA, RSI, S/R จากรูปภาพโดยตรง ให้ต่อ OpenAI Vision หรือโมเดลภาพใน Backend เพิ่มในขั้นถัดไป
+
+
+## v1.3.2 Paste Upload
+- รองรับการวางรูปภาพกราฟจาก Clipboard ด้วย Ctrl+V / Cmd+V
+- รองรับ Drag & Drop และ Choose File เหมือนเดิม
+- เมื่อ Paste รูป ระบบจะอัปโหลดเข้า `/api/chart-image/upload` อัตโนมัติ
+
+
+## Paste Upload Fix v1.3.2
+- รองรับการวางรูปด้วย Ctrl+V / Cmd+V แบบ robust มากขึ้น
+- รองรับการ Copy รูปจาก Snipping Tool, Browser, TradingView Screenshot และไฟล์รูปจากเครื่อง
+- เพิ่มปุ่ม Paste Image สำหรับ Browser ที่รองรับ Clipboard API
+- แนะนำผู้ใช้: คลิกในกรอบอัปโหลด 1 ครั้ง แล้วกด Ctrl+V / Cmd+V
