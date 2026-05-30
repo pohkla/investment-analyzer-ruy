@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: ray-gold-guardian-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SYMBOL
+        value: XAUUSD
+      - key: TRADINGVIEW_WEBHOOK_SECRET
+        sync: false
+      - key: INITIAL_XAUUSD_PRICE
+        value: 3343.10
+      - key: ENABLE_SIMULATED_FEED
+        value: true
+      - key: MAX_CANDLES
+        value: 800

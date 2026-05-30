@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ray Gold Guardian Bot</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon">🤖</div>
+        <div>
+          <h1>Ray Gold Guardian Bot</h1>
+          <p>XAUUSD Real-time Webhook Dashboard • Semi-Auto Trading Assistant</p>
+        </div>
+      </div>
+      <div class="status-group">
+        <span id="wsStatus" class="pill warning">Connecting</span>
+        <span id="apiStatus" class="pill">API Ready</span>
+        <button id="refreshBtn" class="btn ghost">Sync</button>
+      </div>
+    </header>
+
+    <main class="grid-main">
+      <section class="hero-card panel">
+        <div class="hero-head">
+          <div>
+            <div class="badges">
+              <span class="badge gold">XAUUSD</span>
+              <span id="marketMode" class="badge red">WAIT</span>
+              <span class="badge blue">Webhook Ready</span>
+            </div>
+            <div id="price" class="price">--</div>
+            <div id="updatedAt" class="muted">Last sync: --</div>
+          </div>
+          <div class="signal-box">
+            <span>Signal Status</span>
+            <strong id="action">LOADING</strong>
+            <small id="condition">กำลังเชื่อมต่อข้อมูล...</small>
+          </div>
+        </div>
+        <div id="chart" class="chart"></div>
+      </section>
+
+      <aside class="panel plan-card">
+        <div class="section-title">
+          <div>
+            <span class="muted">AI Decision Engine</span>
+            <h2>Trade Plan</h2>
+          </div>
+          <span class="spark">🧠</span>
+        </div>
+        <div class="trade-plan">
+          <div class="plan-highlight">
+            <span>Recommended Action</span>
+            <strong id="recommendedAction">--</strong>
+            <p id="planText">รอข้อมูลวิเคราะห์...</p>
+          </div>
+          <div class="triple">
+            <div><span>Entry</span><strong id="entry">--</strong></div>
+            <div><span>SL</span><strong id="sl">--</strong></div>
+            <div><span>TP1</span><strong id="tp1">--</strong></div>
+          </div>
+          <div class="score-box">
+            <div class="score-line"><span>Confidence Score</span><strong id="confidence">--/100</strong></div>
+            <div class="progress"><i id="confidenceBar"></i></div>
+            <small>ต่ำกว่า 60 = No Trade, 60–75 = Small Lot, 75+ = รอ Confirm แล้วค่อยเข้า</small>
+          </div>
+        </div>
+      </aside>
+
+      <section class="metrics">
+        <div class="metric panel"><span>H1 Bias</span><strong id="h1Bias">--</strong><small>ภาพใหญ่</small></div>
+        <div class="metric panel"><span>M15 Bias</span><strong id="m15Bias">--</strong><small>โครงสร้างย่อย</small></div>
+        <div class="metric panel"><span>Support</span><strong id="support">--</strong><small>M5 lookback</small></div>
+        <div class="metric panel"><span>Resistance</span><strong id="resistance">--</strong><small>M5 lookback</small></div>
+      </section>
+
+      <section class="panel command-card">
+        <div class="section-title">
+          <div>
+            <span class="muted">Command Center</span>
+            <h2>สั่งวิเคราะห์และคุมความเสี่ยง</h2>
+          </div>
+          <span class="spark">⚡</span>
+        </div>
+        <div class="command-row">
+          <input id="commandInput" value="วิเคราะห์ XAUUSD ตอนนี้ ใช้ M1/M5/M15/H1 พร้อม SL TP Lot และบอก Trade หรือ No Trade" />
+          <button id="analyzeBtn" class="btn primary">Analyze</button>
+        </div>
+        <div class="risk-grid">
+          <label>Balance <input id="balance" type="number" value="300" /></label>
+          <label>Risk % <input id="riskPercent" type="number" value="1" step="0.1" /></label>
+          <label>SL Points <input id="slPoints" type="number" value="55" /></label>
+          <div class="lot-box"><span>Suggested Lot</span><strong id="lot">--</strong></div>
+        </div>
+      </section>
+
+      <section class="panel rules-card">
+        <div class="section-title">
+          <div>
+            <span class="muted">Bot Rules</span>
+            <h2>Risk Guard</h2>
+          </div>
+          <span class="spark">🛡️</span>
+        </div>
+        <ul class="rules">
+          <li>ห้ามเปิดไม้ก่อนข่าวแรง 30–60 นาที</li>
+          <li>รอแท่ง M5 ปิดยืนยันก่อนเข้า</li>
+          <li>Daily loss limit 3%</li>
+          <li>แพ้ 2 ไม้ติด ให้พักเพื่อตัด Revenge Trade</li>
+          <li>เข้าเฉพาะ RR อย่างน้อย 1:1.5</li>
+        </ul>
+      </section>
+
+      <section class="panel webhook-card">
+        <div class="section-title">
+          <div>
+            <span class="muted">TradingView Webhook</span>
+            <h2>ตัวอย่างข้อความ Alert</h2>
+          </div>
+          <span class="spark">📡</span>
+        </div>
+        <pre id="webhookSample"></pre>
+        <p class="muted small">นำ URL นี้ไปใส่ใน TradingView Alert: <code id="webhookUrl"></code></p>
+      </section>
+
+      <section class="panel journal-card">
+        <div class="section-title">
+          <div>
+            <span class="muted">Live Log</span>
+            <h2>สัญญาณล่าสุด</h2>
+          </div>
+          <span class="spark">📒</span>
+        </div>
+        <div id="liveLog" class="live-log"></div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
