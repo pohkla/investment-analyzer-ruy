@@ -110,3 +110,84 @@ Manual หรือ Auto Execution
 ## คำเตือน
 
 ระบบนี้เป็นเครื่องมือช่วยวิเคราะห์และจัดการความเสี่ยง ไม่ใช่คำแนะนำการลงทุนหรือการันตีกำไร ควร Backtest และ Forward Test ก่อนใช้งานจริงทุกครั้ง
+
+---
+
+## v1.2 Live Price Feed จริง
+
+เวอร์ชันนี้เพิ่ม Live Price Connector สำหรับดึงราคาจริงเข้าระบบแบบ polling แล้วส่งต่อเข้า Dashboard ผ่าน WebSocket
+
+### วิธีที่แนะนำ: Twelve Data
+
+สมัคร API Key ที่ Twelve Data แล้วตั้ง Environment Variables ใน Render:
+
+```env
+PYTHON_VERSION=3.11.9
+LIVE_PRICE_PROVIDER=twelvedata
+TWELVEDATA_API_KEY=YOUR_TWELVEDATA_API_KEY
+TWELVEDATA_SYMBOL=XAU/USD
+LIVE_POLL_SECONDS=5
+ENABLE_SIMULATED_FEED=false
+SYMBOL=XAUUSD
+INITIAL_XAUUSD_PRICE=4540.00
+TRADINGVIEW_WEBHOOK_SECRET=YOUR_SECRET
+```
+
+### อีกทางเลือก: GoldAPI
+
+```env
+PYTHON_VERSION=3.11.9
+LIVE_PRICE_PROVIDER=goldapi
+GOLDAPI_KEY=YOUR_GOLDAPI_KEY
+GOLDAPI_SYMBOL=XAU
+GOLDAPI_CURRENCY=USD
+LIVE_POLL_SECONDS=5
+ENABLE_SIMULATED_FEED=false
+SYMBOL=XAUUSD
+INITIAL_XAUUSD_PRICE=4540.00
+TRADINGVIEW_WEBHOOK_SECRET=YOUR_SECRET
+```
+
+### ทดสอบหลัง Deploy
+
+```text
+/api/health
+/api/xauusd/live-price
+/api/xauusd/analysis
+```
+
+ถ้า `/api/xauusd/live-price` ส่งกลับ `ok: true` และมี `price` แปลว่า Live Feed เชื่อมสำเร็จ
+
+### หมายเหตุสำคัญ
+
+TradingView Webhook ไม่ใช่ tick stream ต่อเนื่อง โดยจะส่งข้อมูลเข้าระบบเฉพาะเมื่อ Alert ถูก trigger เท่านั้น ถ้าต้องการราคาจริงแบบต่อเนื่อง ให้ใช้ `LIVE_PRICE_PROVIDER=twelvedata` หรือ `goldapi` หรือเชื่อม MT5/Broker API โดยตรง
+
+## v1.3 Image Upload Analysis Ready
+
+เวอร์ชันนี้เปลี่ยนพื้นที่กราฟหลักให้เป็นช่องอัปโหลดรูปภาพกราฟ เพื่อให้ผู้ใช้งานส่งภาพจาก TradingView / MT5 / MT4 เข้ามาประกอบการวิเคราะห์ได้โดยตรง
+
+### API เพิ่มใหม่
+
+```http
+POST /api/chart-image/upload
+```
+
+Form data:
+
+- `file`: รูปภาพกราฟ รองรับ PNG, JPG/JPEG, WEBP
+- `note`: ข้อความประกอบ เช่น Timeframe หรือสิ่งที่ต้องการให้วิเคราะห์
+
+ระบบจะบันทึกภาพไว้ที่ `/static/uploads/...` และส่งผลกลับเป็น `image_url`, metadata และ `analysis_hint`
+
+### Dependency เพิ่มใหม่
+
+```txt
+python-multipart==0.0.20
+```
+
+ใช้สำหรับรับ multipart file upload ผ่าน FastAPI
+
+### หมายเหตุ
+
+- การอัปโหลดภาพตอนนี้เป็น Image Context Mode สำหรับเก็บภาพและใช้ประกอบการวิเคราะห์ร่วมกับราคา Real-time
+- หากต้องการให้ระบบอ่านภาพกราฟแบบ Vision AI จริง เช่น อ่านแท่งเทียน เส้น EMA, RSI, S/R จากรูปภาพโดยตรง ให้ต่อ OpenAI Vision หรือโมเดลภาพใน Backend เพิ่มในขั้นถัดไป

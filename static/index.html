@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ray Gold Guardian Bot</title>
   <link rel="stylesheet" href="/static/styles.css" />
-  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -42,7 +41,30 @@
             <small id="condition">กำลังเชื่อมต่อข้อมูล...</small>
           </div>
         </div>
-        <div id="chart" class="chart"></div>
+        <div class="upload-zone" id="uploadZone">
+          <input id="chartImageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          <div class="upload-empty" id="uploadEmpty">
+            <div class="upload-icon">🖼️</div>
+            <h3>อัปโหลดรูปภาพกราฟ XAUUSD</h3>
+            <p>ลากรูปภาพมาวาง หรือคลิกเพื่อเลือกไฟล์จากเครื่อง เช่น TradingView / MT5 / MT4</p>
+            <div class="upload-actions">
+              <button id="chooseImageBtn" class="btn primary" type="button">Choose Chart Image</button>
+              <span class="muted small">รองรับ PNG, JPG, WEBP ขนาดไม่เกิน 8MB</span>
+            </div>
+          </div>
+          <div class="upload-preview hidden" id="uploadPreviewWrap">
+            <img id="chartPreview" alt="Uploaded chart preview" />
+            <div class="image-result">
+              <span class="muted">Image Analysis Mode</span>
+              <strong id="imageStatus">รออัปโหลดภาพกราฟ</strong>
+              <p id="imageSummary">เมื่ออัปโหลดแล้ว ระบบจะเก็บภาพไว้เพื่อใช้วิเคราะห์ร่วมกับข้อมูลราคาและ Risk Guard</p>
+              <div class="upload-actions">
+                <button id="replaceImageBtn" class="btn ghost" type="button">Replace Image</button>
+                <button id="analyzeImageBtn" class="btn primary" type="button">Analyze Image</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <aside class="panel plan-card">
