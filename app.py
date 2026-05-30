@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-APP_VERSION = "v1.3.0 Image Upload Analysis Ready"
+APP_VERSION = "v1.3.3 Analyze Image Button Fix"
 SYMBOL = os.getenv("SYMBOL", "XAUUSD")
 WEBHOOK_SECRET = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "CHANGE_ME_SECRET")
 INITIAL_PRICE = float(os.getenv("INITIAL_XAUUSD_PRICE", "4540.00"))
@@ -398,6 +398,31 @@ async def upload_chart_image(file: UploadFile = File(...), note: str = Form(defa
     store.last_chart_image = payload
     await broadcast({"type": "chart_image_uploaded", **payload})
     return payload
+
+
+@app.post("/api/chart-image/analyze")
+async def analyze_chart_image(balance: float = 300, risk_percent: float = 1, sl_points: float = 55):
+    if not store.last_chart_image:
+        raise HTTPException(status_code=400, detail="ยังไม่มีภาพกราฟ กรุณาอัปโหลดหรือวางภาพก่อน")
+
+    analysis_payload = Analyzer.analyze(balance=balance, risk_percent=risk_percent, sl_points=sl_points)
+    image_payload = store.last_chart_image
+    image_analysis = {
+        "title": "วิเคราะห์ภาพกราฟแล้ว",
+        "action": analysis_payload.get("action", "NO_TRADE"),
+        "condition": "ใช้ภาพกราฟที่อัปโหลดร่วมกับราคา Real-time, TF Bias, Support/Resistance และ Risk Guard แล้ว โดยปุ่มนี้จะไม่เปิดให้อัปโหลดรูปใหม่",
+        "summary": f"ภาพล่าสุด: {image_payload.get('original_filename') or image_payload.get('filename')} • ราคา: {analysis_payload.get('price')} • Mode: {analysis_payload.get('market_mode')} • Confidence: {analysis_payload.get('confidence')}/100",
+        "note": "เวอร์ชันนี้เป็น Image Context Analysis ยังไม่ได้อ่านแท่งเทียนจากรูปด้วย Vision AI โดยตรง หากต้องการอ่านรูปแบบแท่งเทียน/EMA/RSI จากภาพจริง ต้องต่อ Vision API ในขั้นถัดไป",
+    }
+    result = {
+        "ok": True,
+        "image": image_payload,
+        "analysis": analysis_payload,
+        "image_analysis": image_analysis,
+        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await broadcast({"type": "chart_image_analyzed", **result})
+    return result
 
 @app.post("/api/risk/lot")
 def lot_calc(payload: RiskInput):

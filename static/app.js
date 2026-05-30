@@ -1,5 +1,5 @@
 const el = (id) => document.getElementById(id);
-const state = { ws: null, lastAnalysis: null, uploadedImage: null, lastPasteSig: null, lastPasteAt: 0 };
+const state = { ws: null, lastAnalysis: null, uploadedImage: null, currentImageFile: null, lastPasteSig: null, lastPasteAt: 0 };
 
 function fmt(v, digits = 2) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
@@ -99,6 +99,7 @@ function setupWebhookSample() {
 }
 
 function setUploadPreview(file, previewUrl) {
+  state.currentImageFile = file;
   el('uploadEmpty').classList.add('hidden');
   el('uploadPreviewWrap').classList.remove('hidden');
   el('chartPreview').src = previewUrl;
@@ -139,6 +140,42 @@ async function uploadChartImage(file) {
     el('imageStatus').textContent = 'อัปโหลดไม่สำเร็จ';
     el('imageSummary').textContent = err.message || String(err);
     logItem('Upload Error', err.message || String(err));
+  }
+}
+
+async function analyzeUploadedChartImage() {
+  const balance = el('balance').value || 300;
+  const risk = el('riskPercent').value || 1;
+  const slp = el('slPoints').value || 55;
+
+  if (!state.uploadedImage && state.currentImageFile) {
+    await uploadChartImage(state.currentImageFile);
+  }
+
+  if (!state.uploadedImage) {
+    logItem('Analyze Image', 'ยังไม่มีภาพกราฟ กรุณาวางรูป / ลากรูป / เลือกรูปก่อน');
+    el('imageStatus').textContent = 'ยังไม่มีภาพกราฟ';
+    el('imageSummary').textContent = 'กรุณาวางรูปภาพด้วย Ctrl+V หรือกด Choose Chart Image ก่อน แล้วค่อยกด Analyze Image';
+    return;
+  }
+
+  el('imageStatus').textContent = 'กำลังวิเคราะห์ภาพร่วมกับราคาจริง...';
+  try {
+    const res = await fetch(`/api/chart-image/analyze?balance=${balance}&risk_percent=${risk}&sl_points=${slp}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.detail || data.message || 'Analyze image failed');
+
+    const a = data.analysis;
+    updateAnalysis(a);
+    el('recommendedAction').textContent = data.image_analysis?.action || a.action || 'IMAGE_ANALYZED';
+    el('planText').textContent = data.image_analysis?.condition || a.condition || 'วิเคราะห์ภาพเรียบร้อยแล้ว';
+    el('imageStatus').textContent = data.image_analysis?.title || 'วิเคราะห์ภาพกราฟแล้ว';
+    el('imageSummary').textContent = data.image_analysis?.summary || 'ระบบวิเคราะห์ภาพร่วมกับราคา Real-time และ Risk Guard แล้ว';
+    logItem('Image Analyze Done', `${data.image_analysis?.action || a.action} • Confidence ${a.confidence}/100`);
+  } catch (err) {
+    el('imageStatus').textContent = 'วิเคราะห์ภาพไม่สำเร็จ';
+    el('imageSummary').textContent = err.message || String(err);
+    logItem('Analyze Image Error', err.message || String(err));
   }
 }
 
@@ -237,7 +274,7 @@ function setupImageUpload() {
   const analyze = el('analyzeImageBtn');
 
   [choose, replace].forEach((btn) => btn?.addEventListener('click', () => input.click()));
-  analyze?.addEventListener('click', () => input.files?.[0] ? uploadChartImage(input.files[0]) : input.click());
+  analyze?.addEventListener('click', analyzeUploadedChartImage);
   input.addEventListener('change', () => uploadChartImage(input.files?.[0]));
 
   zone.addEventListener('dragover', (e) => {
