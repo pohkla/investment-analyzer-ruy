@@ -204,3 +204,27 @@ python-multipart==0.0.20
 - รองรับการ Copy รูปจาก Snipping Tool, Browser, TradingView Screenshot และไฟล์รูปจากเครื่อง
 - เพิ่มปุ่ม Paste Image สำหรับ Browser ที่รองรับ Clipboard API
 - แนะนำผู้ใช้: คลิกในกรอบอัปโหลด 1 ครั้ง แล้วกด Ctrl+V / Cmd+V
+
+
+## v1.4 Vision AI Chart Analysis
+
+เพิ่มการวิเคราะห์ภาพกราฟจริงผ่าน Vision AI เมื่อกดปุ่ม **Analyze Image with AI**
+
+### Environment Variables เพิ่มเติม
+
+```env
+OPENAI_API_KEY=ใส่ API Key ของคุณ
+OPENAI_VISION_MODEL=gpt-4o-mini
+VISION_PROVIDER=openai
+```
+
+ถ้าไม่ตั้ง `OPENAI_API_KEY` ระบบยังใช้งานได้ แต่จะเป็นโหมด Context Analysis และจะแจ้งว่า Vision AI ยังไม่เปิดใช้งาน
+
+### Flow การใช้งาน
+
+1. Copy/Paste หรืออัปโหลดภาพกราฟ TradingView / MT5 / MT4
+2. กด Analyze Image with AI
+3. Backend จะส่งภาพ + numeric analysis ไปให้ Vision AI
+4. ระบบอัปเดต Trade Plan, Action, Confirmation, Risk Notes และ Confidence Score
+
+> คำเตือน: ระบบนี้เป็นเครื่องมือช่วยวิเคราะห์ ไม่ใช่คำแนะนำการลงทุนหรือการันตีกำไร

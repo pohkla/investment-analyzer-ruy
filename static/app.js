@@ -69,6 +69,9 @@ function connectWS() {
     if (msg.type === 'chart_image_uploaded') {
       logItem('Chart Image Uploaded', msg.filename || 'ได้รับภาพกราฟแล้ว');
     }
+    if (msg.type === 'chart_image_analyzed') {
+      logItem('Chart Image Analyzed', `${msg.image_analysis?.vision_enabled ? 'Vision AI' : 'Context'} • ${msg.image_analysis?.action || '--'}`);
+    }
     if (msg.type === 'feed_error') {
       logItem('Live Feed Error', msg.error || 'ไม่สามารถดึงราคาจริงได้');
     }
@@ -170,8 +173,11 @@ async function analyzeUploadedChartImage() {
     el('recommendedAction').textContent = data.image_analysis?.action || a.action || 'IMAGE_ANALYZED';
     el('planText').textContent = data.image_analysis?.condition || a.condition || 'วิเคราะห์ภาพเรียบร้อยแล้ว';
     el('imageStatus').textContent = data.image_analysis?.title || 'วิเคราะห์ภาพกราฟแล้ว';
-    el('imageSummary').textContent = data.image_analysis?.summary || 'ระบบวิเคราะห์ภาพร่วมกับราคา Real-time และ Risk Guard แล้ว';
-    logItem('Image Analyze Done', `${data.image_analysis?.action || a.action} • Confidence ${a.confidence}/100`);
+    const ia = data.image_analysis || {};
+    const observations = Array.isArray(ia.observations) && ia.observations.length ? `\nสิ่งที่ Vision เห็น: ${ia.observations.slice(0, 3).join(' • ')}` : '';
+    const levels = Array.isArray(ia.key_levels_from_image) && ia.key_levels_from_image.length ? `\nLevels จากภาพ: ${ia.key_levels_from_image.slice(0, 3).map(x => `${x.type || 'level'} ${x.level || ''}`).join(' • ')}` : '';
+    el('imageSummary').textContent = `${ia.summary || 'ระบบวิเคราะห์ภาพร่วมกับราคา Real-time และ Risk Guard แล้ว'}${observations}${levels}`;
+    logItem('Image Analyze Done', `${ia.vision_enabled ? 'Vision AI' : 'Context'} • ${ia.action || a.action} • Confidence ${a.confidence}/100`);
   } catch (err) {
     el('imageStatus').textContent = 'วิเคราะห์ภาพไม่สำเร็จ';
     el('imageSummary').textContent = err.message || String(err);

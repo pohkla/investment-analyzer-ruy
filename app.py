@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import math
 import os
@@ -16,7 +17,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-APP_VERSION = "v1.3.3 Analyze Image Button Fix"
+APP_VERSION = "v1.4 Vision AI Chart Analysis"
 SYMBOL = os.getenv("SYMBOL", "XAUUSD")
 WEBHOOK_SECRET = os.getenv("TRADINGVIEW_WEBHOOK_SECRET", "CHANGE_ME_SECRET")
 INITIAL_PRICE = float(os.getenv("INITIAL_XAUUSD_PRICE", "4540.00"))
@@ -25,6 +26,12 @@ MAX_CANDLES = int(os.getenv("MAX_CANDLES", "800"))
 UPLOAD_DIR = Path("static/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 MAX_IMAGE_UPLOAD_MB = int(os.getenv("MAX_IMAGE_UPLOAD_MB", "8"))
+
+# Vision AI settings
+# Set OPENAI_API_KEY on Render to enable direct chart-image reading.
+VISION_PROVIDER = os.getenv("VISION_PROVIDER", "openai").lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini")
 
 # Live feed settings
 # LIVE_PRICE_PROVIDER options: none | twelvedata | goldapi
@@ -310,6 +317,139 @@ class Analyzer:
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
+
+
+class VisionAnalyzer:
+    @staticmethod
+    def _extract_json(text: str) -> dict:
+        """Best-effort JSON extraction from model output."""
+        if not text:
+            return {}
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:].strip()
+        try:
+            return json.loads(cleaned)
+        except Exception:
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start >= 0 and end > start:
+                try:
+                    return json.loads(cleaned[start:end + 1])
+                except Exception:
+                    pass
+        return {"raw_text": text}
+
+    @staticmethod
+    async def analyze_image(image_payload: dict, numeric_analysis: dict) -> dict:
+        """Analyze the uploaded chart image with Vision AI when OPENAI_API_KEY is available.
+
+        If no key is configured, return a safe fallback so the app still works on Render.
+        """
+        filename = image_payload.get("filename")
+        content_type = image_payload.get("content_type") or "image/png"
+        image_path = UPLOAD_DIR / filename if filename else None
+
+        fallback = {
+            "enabled": False,
+            "provider": VISION_PROVIDER,
+            "model": OPENAI_VISION_MODEL,
+            "summary": "ยังไม่ได้เปิด Vision AI เพราะยังไม่ได้ตั้งค่า OPENAI_API_KEY ใน Render",
+            "observations": [
+                "ระบบใช้ภาพเป็นบริบทแล้ว แต่ยังไม่ได้อ่านแท่งเทียน/EMA/RSI จากภาพโดยตรง",
+                "เพิ่ม OPENAI_API_KEY เพื่อให้ระบบอ่านข้อความจากภาพและวิเคราะห์ภาพกราฟจริง"
+            ],
+            "chart_bias": "UNKNOWN",
+            "key_levels_from_image": [],
+            "trade_action": numeric_analysis.get("action", "NO_TRADE"),
+            "confidence_adjustment": 0,
+            "risk_notes": ["ห้ามเข้าไม้จากภาพอย่างเดียว ต้องรอ confirmation และคุม risk ตามระบบ"],
+            "raw_text": None,
+        }
+
+        if not OPENAI_API_KEY:
+            return fallback
+        if not image_path or not image_path.exists():
+            fallback["summary"] = "ไม่พบไฟล์ภาพล่าสุดบนเซิร์ฟเวอร์ กรุณาอัปโหลดหรือวางภาพใหม่"
+            return fallback
+
+        raw = image_path.read_bytes()
+        b64 = base64.b64encode(raw).decode("utf-8")
+        data_url = f"data:{content_type};base64,{b64}"
+
+        system_prompt = (
+            "You are Ray Gold Guardian Bot, an expert XAUUSD chart analyst. "
+            "Analyze the uploaded trading chart image. Be conservative. "
+            "Do not claim certainty. Return ONLY valid JSON in Thai language."
+        )
+        user_text = {
+            "task": "วิเคราะห์ภาพกราฟ XAUUSD จากรูปภาพจริง แล้วใช้ร่วมกับ numeric_analysis ของระบบ",
+            "numeric_analysis": numeric_analysis,
+            "required_json_schema": {
+                "summary": "สรุปภาพรวมจากภาพ 1-2 ประโยค",
+                "observations": ["สิ่งที่เห็นจากภาพ เช่น trend, EMA, RSI, candle structure"],
+                "chart_bias": "BULLISH | BEARISH | RANGE | MIXED | UNKNOWN",
+                "key_levels_from_image": [
+                    {"level": 0, "type": "support/resistance/supply/demand", "reason": "เหตุผลจากภาพ"}
+                ],
+                "trade_action": "NO_TRADE | WAIT_CONFIRM_BUY | WAIT_CONFIRM_SELL | BUY_READY | SELL_READY",
+                "entry_plan": {"entry": None, "sl": None, "tp1": None, "tp2": None},
+                "confirmation_needed": ["เงื่อนไขที่ต้องรอก่อนเข้า"],
+                "risk_notes": ["ข้อควรระวัง"],
+                "confidence_adjustment": 0
+            }
+        }
+
+        body = {
+            "model": OPENAI_VISION_MODEL,
+            "temperature": 0.2,
+            "max_tokens": 900,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": json.dumps(user_text, ensure_ascii=False)},
+                        {"type": "image_url", "image_url": {"url": data_url}}
+                    ]
+                }
+            ]
+        }
+        headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=45) as client:
+            r = await client.post("https://api.openai.com/v1/chat/completions", headers=headers, json=body)
+            if r.status_code >= 400:
+                return {
+                    **fallback,
+                    "enabled": False,
+                    "summary": f"Vision AI เรียกใช้งานไม่สำเร็จ: HTTP {r.status_code}",
+                    "raw_text": r.text[:800],
+                }
+            data = r.json()
+
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        parsed = VisionAnalyzer._extract_json(content)
+        if not isinstance(parsed, dict):
+            parsed = {"raw_text": content}
+
+        return {
+            "enabled": True,
+            "provider": VISION_PROVIDER,
+            "model": OPENAI_VISION_MODEL,
+            "summary": parsed.get("summary") or "Vision AI วิเคราะห์ภาพแล้ว แต่ไม่ได้ส่ง summary กลับมา",
+            "observations": parsed.get("observations") or [],
+            "chart_bias": parsed.get("chart_bias") or "UNKNOWN",
+            "key_levels_from_image": parsed.get("key_levels_from_image") or [],
+            "trade_action": parsed.get("trade_action") or numeric_analysis.get("action", "NO_TRADE"),
+            "entry_plan": parsed.get("entry_plan") or {},
+            "confirmation_needed": parsed.get("confirmation_needed") or [],
+            "risk_notes": parsed.get("risk_notes") or [],
+            "confidence_adjustment": int(parsed.get("confidence_adjustment") or 0),
+            "raw_text": content,
+        }
+
 async def broadcast(payload: dict):
     dead = []
     text = json.dumps(payload, ensure_ascii=False)
@@ -407,18 +547,30 @@ async def analyze_chart_image(balance: float = 300, risk_percent: float = 1, sl_
 
     analysis_payload = Analyzer.analyze(balance=balance, risk_percent=risk_percent, sl_points=sl_points)
     image_payload = store.last_chart_image
+    vision = await VisionAnalyzer.analyze_image(image_payload, analysis_payload)
+
+    adjusted_confidence = analysis_payload.get("confidence", 50) + int(vision.get("confidence_adjustment") or 0)
+    analysis_payload["confidence"] = min(95, max(30, adjusted_confidence))
+    if vision.get("trade_action") and vision.get("trade_action") != "UNKNOWN":
+        analysis_payload["action"] = vision.get("trade_action")
+
     image_analysis = {
-        "title": "วิเคราะห์ภาพกราฟแล้ว",
+        "title": "Vision AI วิเคราะห์ภาพกราฟแล้ว" if vision.get("enabled") else "วิเคราะห์ภาพกราฟแบบ Context แล้ว",
         "action": analysis_payload.get("action", "NO_TRADE"),
-        "condition": "ใช้ภาพกราฟที่อัปโหลดร่วมกับราคา Real-time, TF Bias, Support/Resistance และ Risk Guard แล้ว โดยปุ่มนี้จะไม่เปิดให้อัปโหลดรูปใหม่",
-        "summary": f"ภาพล่าสุด: {image_payload.get('original_filename') or image_payload.get('filename')} • ราคา: {analysis_payload.get('price')} • Mode: {analysis_payload.get('market_mode')} • Confidence: {analysis_payload.get('confidence')}/100",
-        "note": "เวอร์ชันนี้เป็น Image Context Analysis ยังไม่ได้อ่านแท่งเทียนจากรูปด้วย Vision AI โดยตรง หากต้องการอ่านรูปแบบแท่งเทียน/EMA/RSI จากภาพจริง ต้องต่อ Vision API ในขั้นถัดไป",
+        "condition": "; ".join(vision.get("confirmation_needed") or []) or analysis_payload.get("condition") or "รอ confirmation ก่อนเข้าไม้",
+        "summary": vision.get("summary") or f"ภาพล่าสุด: {image_payload.get('original_filename') or image_payload.get('filename')} • ราคา: {analysis_payload.get('price')} • Mode: {analysis_payload.get('market_mode')} • Confidence: {analysis_payload.get('confidence')}/100",
+        "observations": vision.get("observations") or [],
+        "chart_bias": vision.get("chart_bias", "UNKNOWN"),
+        "key_levels_from_image": vision.get("key_levels_from_image") or [],
+        "risk_notes": vision.get("risk_notes") or [],
+        "vision_enabled": vision.get("enabled", False),
     }
     result = {
         "ok": True,
         "image": image_payload,
         "analysis": analysis_payload,
         "image_analysis": image_analysis,
+        "vision": vision,
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
     }
     await broadcast({"type": "chart_image_analyzed", **result})
